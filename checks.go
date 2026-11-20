@@ -81,7 +81,7 @@ func readBanner(c net.Conn) string {
 }
 
 // TLSAudit handshakes and reports certificate and protocol problems.
-// Verification is disabled on purpose: scantling records certificate facts
+// Verification is disabled on purpose: secscope records certificate facts
 // instead of trusting chains, and self-signed certs are common in scope.
 func TLSAudit(target string, port int, dial DialFunc, timeout time.Duration) []Finding {
 	addr := net.JoinHostPort(target, fmt.Sprint(port))
