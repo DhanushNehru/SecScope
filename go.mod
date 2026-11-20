@@ -1,3 +1,3 @@
-module github.com/DhanushNehru/scantling
+module github.com/DhanushNehru/SecScope
 
 go 1.23
