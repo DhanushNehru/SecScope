@@ -64,7 +64,7 @@ func (r *Run) JSON() ([]byte, error) {
 // Markdown renders the human-readable report.
 func (r *Run) Markdown() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# scantling report\n\n")
+	fmt.Fprintf(&b, "# secscope report\n\n")
 	fmt.Fprintf(&b, "Started %s, finished %s (%s).\n\n",
 		r.StartedAt.Format("2006-01-02 15:04:05 MST"), r.FinishedAt.Format("15:04:05 MST"),
 		r.FinishedAt.Sub(r.StartedAt).Round(time.Second))
