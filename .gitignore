@@ -1,0 +1,12 @@
+# build output
+/secscope
+secscope-report/
+
+# Go bits
+*.test
+*.out
+/vendor/
+
+# editor droppings
+*.swp
+.DS_Store

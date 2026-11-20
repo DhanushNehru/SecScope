@@ -1,0 +1,14 @@
+# secscope allowlist: one authorized target per line.
+# Only what is written here is ever contacted. Lines starting with # are ignored.
+
+# a single host (any port, any path)
+staging.example.com
+
+# one IP
+192.0.2.10
+
+# a range - authorizes listed hosts/URLs, never enumerated on its own
+203.0.113.0/29
+
+# a URL - restricts checks to this host and path prefix
+https://example.com/app/
