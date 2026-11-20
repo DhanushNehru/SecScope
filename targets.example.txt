@@ -1,4 +1,4 @@
-# scantling allowlist: one authorized target per line.
+# secscope allowlist: one authorized target per line.
 # Only what is written here is ever contacted. Lines starting with # are ignored.
 
 # a single host (any port, any path)
