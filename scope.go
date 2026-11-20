@@ -1,6 +1,6 @@
 // Package scope parses and enforces the explicit target allowlist.
 //
-// The allowlist is the contract between the operator and scantling: only
+// The allowlist is the contract between the operator and secscope: only
 // hosts, addresses, ranges and URLs written in that file are ever touched.
 package main
 
@@ -59,7 +59,7 @@ func Parse(lines []string) (*Scope, error) {
 		}
 	}
 	if s.Empty() {
-		return nil, fmt.Errorf("allowlist has no entries; scantling only runs against an explicit allowlist")
+		return nil, fmt.Errorf("allowlist has no entries; secscope only runs against an explicit allowlist")
 	}
 	return s, nil
 }
