@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Spec describes the machine scantling is running on.
+// Spec describes the machine secscope is running on.
 type Spec struct {
 	CPUs       int
 	TotalMemMB uint64
@@ -45,7 +45,7 @@ type Mode struct {
 	GlobalRate  int           // probes per second across all targets
 	DialTimeout time.Duration // per-connection timeout
 	HTTPTimeout time.Duration // per-request timeout
-	SoftRSSMB   uint64        // memory level where scantling eases off
+	SoftRSSMB   uint64        // memory level where secscope eases off
 }
 
 // Table lists the available modes, lowest footprint first.
