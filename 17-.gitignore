@@ -1,0 +1,12 @@
+# build output
+/scantling
+scantling-report/
+
+# Go bits
+*.test
+*.out
+/vendor/
+
+# editor droppings
+*.swp
+.DS_Store
