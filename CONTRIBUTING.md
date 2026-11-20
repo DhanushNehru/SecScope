@@ -4,7 +4,7 @@ Thanks for helping out. A few ground rules keep this project useful and safe.
 
 ## The safety rules are not negotiable
 
-scantling exists to check systems the operator is explicitly authorized to
+secscope exists to check systems the operator is explicitly authorized to
 test. Contributions that keep that boundary tight are welcome; contributions
 that weaken it are not.
 
