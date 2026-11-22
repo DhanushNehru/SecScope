@@ -40,6 +40,12 @@ Then run:
 secscope run --allow targets.txt
 ```
 
+A run moves through five stages: scope, recon, analyse, verify, report. Its state lives in `secscope-report/session.json`, saved after every stage, so an interrupted run continues where it stopped:
+
+```sh
+secscope run --allow targets.txt --resume
+```
+
 Reports land in `secscope-report/` as `report.md` and `report.json`. `secscope` exits 1 when a finding at or above `--fail-on` (default `medium`) exists, so it slots into CI.
 
 Other entry points:
@@ -47,6 +53,7 @@ Other entry points:
 ```sh
 secscope modes                    # show this machine's specs and the mode table
 secscope scope --allow targets.txt  # print the parsed scope, touch nothing
+secscope session --dir secscope-report  # show the stage and task state of a run
 ```
 
 ## Modes
@@ -72,12 +79,23 @@ secscope: done in 2s - high 0, medium 0, low 0, info 2; report in secscope-repor
 
 Peak RSS for that run: 6 MiB.
 
+## The pipeline
+
+Each stage saves the session before the next starts, and `--resume` picks up at the first stage that is not done. Resuming against a different allowlist is refused: start a new run or use another `--out` directory.
+
+- **scope** records the parsed allowlist. Nothing is contacted.
+- **recon** runs the probes below and collects findings.
+- **analyse** works locally on those findings: banners are matched against a curated table of version-pinned vulnerability hints, every finding gets a concrete fix from the built-in knowledge base, and the findings become a task graph. The graph is plain JSON rules (risky open ports and exposed files need confirming, expired certificates and version hints need review), so what happens next is decided by code you can read, not by anything external.
+- **verify** works the open tasks with the same read-only primitives recon used: one connect, one GET, under the same rate limit, memory throttle and pinned DNS, counted as probes like any other. Tasks come out confirmed or ruled out, so the report separates what stood from what was noise.
+- **report** writes report v2: prioritized findings each with a fix, the task outcomes, the stage history, and the coverage and limitations section.
+
 ## What gets checked
 
 - **Ports** — a small curated set of common ports (override with `--ports`). Open database/remote-admin services (Redis, MongoDB, RDP, the unencrypted Docker API, Telnet, ...) are flagged for review.
 - **TLS** — on 443/8443 and allowlisted `https://` URLs: negotiated version below 1.2, expired or expiring certificates.
 - **Headers and cookies** — on common web ports and allowlisted URLs: missing Content-Security-Policy, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy; cookies missing HttpOnly, Secure or SameSite.
 - **Exposed files** — plain GETs for `/.git/HEAD`, `/.env`, `/server-status`, and a note when `/.well-known/security.txt` is absent.
+- **Known versions**: service banners captured during recon are matched against a small curated table of version-pinned vulnerability hints in the analyse stage. A hint says the disclosed version is known vulnerable; it never claims the target was exploited.
 
 Every check is a TCP connect, a TLS handshake, a banner read, or an HTTP GET/HEAD. Nothing is written, no credentials are tried, no payloads are sent.
 
@@ -94,7 +112,7 @@ Only run secscope against systems you own or have written permission to test.
 
 ## What the report says and does not say
 
-Reports end with a coverage and limitations section, because a clean result here is narrow on purpose: no authenticated testing, no crawling, no exploit verification, no brute force. An open port or a missing header is a lead to review, not proof of a vulnerability. Results are point-in-time and cover only the allowlisted scope.
+Reports end with a coverage and limitations section, because a clean result here is narrow on purpose: no authenticated testing, no crawling, no exploit verification, no brute force. An open port or a missing header is a lead to review, not proof of a vulnerability. Every finding that has a known next step carries a fix line, and the tasks section shows what the verify stage confirmed, ruled out, or left for human review. Results are point-in-time and cover only the allowlisted scope.
 
 ## Development
 

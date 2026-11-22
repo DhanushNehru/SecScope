@@ -22,6 +22,7 @@ type Finding struct {
 	Severity string `json:"severity"` // info, low, medium, high
 	Title    string `json:"title"`
 	Evidence string `json:"evidence"`
+	Fix      string `json:"fix,omitempty"`
 }
 
 // DefaultPorts is the small curated set probed per host.
