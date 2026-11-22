@@ -221,7 +221,13 @@ func (e *Engine) assess(ctx context.Context, t target, limiter *time.Ticker, out
 		if p := u.Port(); p != "" {
 			fmt.Sscan(p, &port)
 		}
+		// URL entries restrict checks to their path prefix: audit the
+		// entry URL and probe sensitive paths beneath it, never the
+		// host root.
 		base := u.Scheme + "://" + u.Host
+		if p := strings.TrimRight(u.EscapedPath(), "/"); p != "" {
+			base += p
+		}
 		if isTLS {
 			if !e.acquire(ctx, limiter) {
 				break

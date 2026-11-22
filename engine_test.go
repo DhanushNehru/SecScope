@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -129,5 +130,45 @@ func TestRedirectOutsideScope(t *testing.T) {
 	_, err = client.Get(web.URL)
 	if err == nil || !strings.Contains(err.Error(), "outside allowlist") {
 		t.Fatalf("redirect outside allowlist must be refused, got %v", err)
+	}
+}
+
+// TestURLPathPrefixRespected scans a URL entry with a path prefix and
+// confirms header and exposure checks stay beneath that prefix instead
+// of dropping to the host root.
+func TestURLPathPrefixRespected(t *testing.T) {
+	var mu sync.Mutex
+	var hits []string
+	web := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits = append(hits, r.URL.Path)
+		mu.Unlock()
+		w.WriteHeader(200)
+	}))
+	defer web.Close()
+
+	_, portStr, _ := net.SplitHostPort(strings.TrimPrefix(web.URL, "http://"))
+	var webPort int
+	fmt.Sscan(portStr, &webPort)
+
+	sc, err := Parse([]string{web.URL + "/app/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mode := Table()[0]
+	eng := New(Config{Mode: mode, ModeReason: "test", Ports: []int{webPort}, MaxRuntime: time.Minute}, sc, Spec{CPUs: 2, TotalMemMB: 4096})
+	if _, err := eng.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(hits) == 0 {
+		t.Fatal("expected header and exposure checks to hit the fixture")
+	}
+	for _, h := range hits {
+		if h != "/app" && !strings.HasPrefix(h, "/app/") {
+			t.Fatalf("check escaped the URL path prefix: got %q, hits %v", h, hits)
+		}
 	}
 }
