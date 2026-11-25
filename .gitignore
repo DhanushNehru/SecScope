@@ -10,3 +10,6 @@ secscope-report/
 # editor droppings
 *.swp
 .DS_Store
+
+# compiled binary produced by go build in the repo root
+SecScope

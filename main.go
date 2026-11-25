@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -19,8 +18,13 @@ const usage = `secscope - authorized security surface assessment, sized to your 
 
 Usage:
   secscope run --allow targets.txt [flags]   run an assessment
+  secscope session --dir secscope-report     show the state of a saved session
   secscope modes                             show this machine's specs and the mode table
   secscope scope --allow targets.txt         print the parsed scope and exit
+
+A run moves through five stages (scope, recon, analyse, verify, report)
+and saves its session after each one. Re-run with --resume to continue an
+interrupted session from its last finished stage.
 
 Only hosts, addresses, ranges and URLs written in the allowlist file are
 ever contacted. All checks are read-only.
@@ -35,6 +39,8 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		code = cmdRun(os.Args[2:])
+	case "session":
+		code = cmdSession(os.Args[2:])
 	case "modes":
 		code = cmdModes()
 	case "scope":
@@ -54,6 +60,7 @@ func cmdRun(args []string) int {
 	out := fs.String("out", "secscope-report", "output directory for the report")
 	maxRuntime := fs.Duration("max-runtime", 30*time.Minute, "stop the whole run after this long")
 	failOn := fs.String("fail-on", "medium", "exit 1 when a finding of this severity or worse exists (info, low, medium, high, never)")
+	resume := fs.Bool("resume", false, "resume the session saved in --out instead of starting over")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -89,26 +96,17 @@ func cmdRun(args []string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	eng := New(Config{Mode: mode, ModeReason: reason, Ports: portList, MaxRuntime: *maxRuntime}, sc, spec)
-	run, err := eng.Run(ctx)
+	pipe := NewPipeline(Config{Mode: mode, ModeReason: reason, Ports: portList, MaxRuntime: *maxRuntime}, sc, spec, *out)
+	session, err := pipe.Run(ctx, *resume)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "secscope:", err)
 		return 2
 	}
-	if err := os.MkdirAll(*out, 0o755); err != nil {
-		fmt.Fprintln(os.Stderr, "secscope:", err)
-		return 2
+	run := session.Run
+	c := map[string]int{"info": 0, "low": 0, "medium": 0, "high": 0}
+	for _, f := range run.Findings {
+		c[f.Severity]++
 	}
-	j, _ := run.JSON()
-	if err := os.WriteFile(filepath.Join(*out, "report.json"), j, 0o644); err != nil {
-		fmt.Fprintln(os.Stderr, "secscope:", err)
-		return 2
-	}
-	if err := os.WriteFile(filepath.Join(*out, "report.md"), []byte(run.Markdown()), 0o644); err != nil {
-		fmt.Fprintln(os.Stderr, "secscope:", err)
-		return 2
-	}
-	c := run.Counts()
 	fmt.Printf("secscope: done in %s - high %d, medium %d, low %d, info %d; report in %s/\n",
 		run.FinishedAt.Sub(run.StartedAt).Round(time.Second), c["high"], c["medium"], c["low"], c["info"], *out)
 
@@ -118,8 +116,41 @@ func cmdRun(args []string) int {
 		fmt.Fprintln(os.Stderr, "secscope: bad --fail-on value")
 		return 2
 	}
-	if *failOn != "never" && order[run.MaxSeverity()] >= thr && run.MaxSeverity() != "" {
+	max := maxSeverityOf(run.Findings)
+	if *failOn != "never" && max != "" && order[max] >= thr {
 		return 1
+	}
+	return 0
+}
+
+func cmdSession(args []string) int {
+	fs := flag.NewFlagSet("session", flag.ContinueOnError)
+	dir := fs.String("dir", "secscope-report", "output directory holding the session")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	s, err := LoadSession(*dir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "secscope:", err)
+		return 2
+	}
+	fmt.Printf("session %s, created %s, mode %s\n", s.ID, s.CreatedAt.Format("2006-01-02 15:04:05 MST"), s.Mode)
+	for _, name := range stageOrder {
+		st := s.Stages[name]
+		line := name + ": " + st.Status
+		if st.Note != "" {
+			line += " (" + st.Note + ")"
+		}
+		fmt.Println(line)
+	}
+	if len(s.Tasks) > 0 {
+		tc := taskCounts(s.Tasks)
+		fmt.Printf("tasks: %d confirmed, %d ruled out, %d noted, %d open\n",
+			tc[taskConfirmed], tc[taskRuledOut], tc[taskNoted], tc[taskOpen])
+	}
+	if s.Run != nil {
+		c := s.Run.Counts()
+		fmt.Printf("findings: high %d, medium %d, low %d, info %d\n", c["high"], c["medium"], c["low"], c["info"])
 	}
 	return 0
 }
